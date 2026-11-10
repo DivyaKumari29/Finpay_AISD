@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FinPay</title>
+<style>
+/* ─── Reset & Base ─────────────────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-from:#c9d8e8;--bg-to:#dce8f0;
+  --glass:rgba(255,255,255,0.72);--glass-border:rgba(255,255,255,0.9);
+  --shadow:0 4px 24px rgba(100,130,160,0.13),0 1.5px 6px rgba(80,110,140,0.08);
+  --shadow-sm:0 2px 10px rgba(100,130,160,0.10);
+  --ink:#1a2535;--ink2:#4a5568;--mut:#8fa0b5;
+  --pri:#4b7cf3;--pri-dark:#3563d4;
+  --ok:#22c55e;--bad:#ef4444;--warn:#f59e0b;
+  --radius:16px;--radius-sm:10px;
+  --sidebar:68px;
+}
+html,body{height:100%;font-family:'Segoe UI',system-ui,Arial,sans-serif;background:linear-gradient(135deg,var(--bg-from) 0%,var(--bg-to) 100%);background-attachment:fixed;color:var(--ink);min-height:100vh}
+body::before,body::after{content:'';position:fixed;border-radius:50%;filter:blur(80px);opacity:.35;pointer-events:none;z-index:0}
+body::before{width:600px;height:600px;background:radial-gradient(circle,#b8d0e8 0%,#c5daf0 100%);top:-120px;left:-120px}
+body::after{width:500px;height:500px;background:radial-gradient(circle,#d4e8f8 0%,#c0d5e9 100%);bottom:-80px;right:-80px}
+
+/* ─── Shell ────────────────────────────────────────────────────────────────── */
+#shell{position:relative;z-index:1;display:flex;min-height:100vh}
+
+/* ─── Sidebar ──────────────────────────────────────────────────────────────── */
+#sidebar{
+  width:var(--sidebar);min-height:100vh;
+  background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-right:1.5px solid var(--glass-border);
+  display:flex;flex-direction:column;align-items:center;
+  padding:20px 0;gap:4px;position:sticky;top:0;height:100vh;
+  box-shadow:2px 0 16px rgba(100,130,160,0.08);
+}
+.sib{
+  width:44px;height:44px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;border:none;background:transparent;
+  color:var(--ink2);transition:background .18s,transform .15s,color .15s;
+}
+.sib svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.sib:hover{background:rgba(255,255,255,0.7);transform:scale(1.07)}
+.sib.active{background:var(--pri);color:#fff;box-shadow:0 4px 14px rgba(75,124,243,0.35)}
+.sib.active svg{stroke:#fff}
+.sib-logo{
+  background:var(--pri);color:#fff;border-radius:14px;
+  font-size:14px;font-weight:800;letter-spacing:-.5px;margin-bottom:8px;cursor:default;
+}
+.sib-logo:hover{background:var(--pri);transform:none}
+.sib-spacer{flex:1}
+.sib-logout{color:var(--bad)}
+.sib-logout:hover{background:rgba(239,68,68,0.1)}
+.sib-logout svg{stroke:var(--bad)}
+
+/* ─── Main content ─────────────────────────────────────────────────────────── */
+#content{flex:1;padding:28px 28px 28px 24px;min-height:100vh;overflow-y:auto}
+.page{display:none}.page.active{display:block}
+
+/* ─── Top bar ──────────────────────────────────────────────────────────────── */
+#topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+#greeting{font-size:15px;font-weight:600;color:var(--ink2)}
+#greeting span{color:var(--pri)}
+.topbar-right{display:flex;align-items:center;gap:10px}
+#clock-mini{font-size:13px;color:var(--mut);font-weight:500}
+#user-pill{
+  background:var(--glass);border:1.5px solid var(--glass-border);
+  border-radius:99px;padding:6px 14px 6px 8px;
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:600;color:var(--ink);
+  box-shadow:var(--shadow-sm);cursor:default;
+}
+#user-pill .avatar{
+  width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(135deg,var(--pri),#7ba7f7);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:11px;font-weight:700;
+}
+#logout-btn{
+  background:transparent;border:1.5px solid rgba(100,130,160,0.25);
+  border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;
+  color:var(--ink2);cursor:pointer;transition:all .18s;
+}
+#logout-btn:hover{background:var(--bad);color:#fff;border-color:var(--bad)}
+.hide{display:none!important}
+
+/* ─── Clock (auth page) ────────────────────────────────────────────────────── */
+#clock-wrap{display:none}
+
+/* ─── Glass Card ───────────────────────────────────────────────────────────── */
+.card{
+  background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1.5px solid var(--glass-border);border-radius:var(--radius);
+  padding:20px;box-shadow:var(--shadow);transition:box-shadow .2s;
+}
+.card:hover{box-shadow:0 8px 32px rgba(100,130,160,0.18),0 2px 8px rgba(80,110,140,0.10)}
+
+/* ─── Grids ────────────────────────────────────────────────────────────────── */
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:16px}
+.grid-auto{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:16px}
+@media(max-width:768px){.grid-3,.grid-2{grid-template-columns:1fr}}
+
+/* ─── Typography ───────────────────────────────────────────────────────────── */
+.sec-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--mut);margin-bottom:14px}
+.card-title{font-size:14px;font-weight:600;color:var(--ink2);margin-bottom:4px}
+.card-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-title-row .card-title{margin-bottom:0}
+.big-num{font-size:36px;font-weight:700;color:var(--ink);letter-spacing:-1px;line-height:1.1}
+.sub-label{font-size:12px;color:var(--mut);margin-top:4px;font-weight:500}
+
+/* ─── Form ─────────────────────────────────────────────────────────────────── */
+input,select{
+  width:100%;padding:10px 13px;border-radius:var(--radius-sm);
+  border:1.5px solid rgba(150,175,200,0.3);background:rgba(255,255,255,0.65);
+  color:var(--ink);font:inherit;font-size:14px;margin-bottom:10px;
+  transition:border .18s,box-shadow .18s;outline:none;backdrop-filter:blur(8px);
+}
+input:focus,select:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(75,124,243,0.12)}
+input::placeholder{color:var(--mut)}
+
+/* ─── Buttons ──────────────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 20px;border-radius:var(--radius-sm);border:none;font:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:all .18s;width:100%}
+.btn-primary{background:var(--pri);color:#fff;box-shadow:0 4px 14px rgba(75,124,243,0.3)}
+.btn-primary:hover{background:var(--pri-dark);transform:translateY(-1px);box-shadow:0 6px 18px rgba(75,124,243,0.38)}
+.btn-primary:active{transform:translateY(0)}
+.btn-ghost{background:rgba(255,255,255,0.5);color:var(--ink2);border:1.5px solid rgba(150,175,200,0.3)}
+.btn-ghost:hover{background:rgba(255,255,255,0.75)}
+
+/* ─── Icon button (card header icons) ─────────────────────────────────────── */
+.icon-wrap{
+  width:34px;height:34px;border-radius:9px;
+  background:rgba(75,124,243,0.09);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.icon-wrap svg{width:16px;height:16px;stroke:var(--pri);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.icon-wrap.ok{background:rgba(34,197,94,0.1)}
+.icon-wrap.ok svg{stroke:var(--ok)}
+.icon-wrap.warn{background:rgba(245,158,11,0.1)}
+.icon-wrap.warn svg{stroke:var(--warn)}
+.icon-wrap.bad{background:rgba(239,68,68,0.1)}
+.icon-wrap.bad svg{stroke:var(--bad)}
+
+/* ─── Tabs ─────────────────────────────────────────────────────────────────── */
+.tabs{display:flex;gap:4px;background:rgba(255,255,255,0.4);border-radius:var(--radius-sm);padding:4px;margin-bottom:18px}
+.tab{flex:1;padding:8px;text-align:center;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;color:var(--ink2);border:none;background:transparent;transition:all .18s}
+.tab.on{background:#fff;color:var(--pri);box-shadow:var(--shadow-sm)}
+
+/* ─── Badge ────────────────────────────────────────────────────────────────── */
+.badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.3px}
+.badge-ok{background:rgba(34,197,94,.15);color:#15803d}
+.badge-bad{background:rgba(239,68,68,.13);color:#b91c1c}
+.badge-warn{background:rgba(245,158,11,.13);color:#b45309}
+.badge-pri{background:rgba(75,124,243,.13);color:var(--pri-dark)}
+
+/* ─── Table ────────────────────────────────────────────────────────────────── */
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius-sm);margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:9px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);border-bottom:1.5px solid rgba(150,175,200,0.2)}
+td{padding:10px 12px;border-bottom:1px solid rgba(150,175,200,0.12);color:var(--ink);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,0.4)}
+.pos{color:#15803d;font-weight:600}.neg{color:#b91c1c;font-weight:600}
+
+/* ─── Toast ────────────────────────────────────────────────────────────────── */
+#toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);
+  padding:11px 22px;border-radius:12px;color:#fff;font-size:14px;font-weight:600;
+  display:none;z-index:999;box-shadow:0 8px 28px rgba(0,0,0,.18);
+  opacity:0;transition:opacity .3s,transform .3s;backdrop-filter:blur(12px);
+}
+#toast.show{display:block;opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ─── Auth ─────────────────────────────────────────────────────────────────── */
+#auth-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;position:relative;z-index:1}
+#auth-card{width:100%;max-width:380px}
+.auth-logo-icon{width:48px;height:48px;border-radius:14px;background:var(--pri);display:flex;align-items:center;justify-content:center;margin:0 auto 10px}
+.auth-logo-icon svg{width:26px;height:26px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ─── Cashback pill ────────────────────────────────────────────────────────── */
+.cashback-pill{
+  background:linear-gradient(90deg,rgba(75,124,243,.12),rgba(123,167,247,.08));
+  border:1.5px solid rgba(75,124,243,.2);border-radius:99px;
+  padding:5px 12px;font-size:12px;color:var(--pri-dark);font-weight:600;
+  display:inline-flex;align-items:center;gap:5px;margin-top:8px;
+}
+.cashback-pill svg{width:12px;height:12px;stroke:var(--pri-dark);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ─── Empty state ──────────────────────────────────────────────────────────── */
+.empty{text-align:center;padding:32px 16px;color:var(--mut);font-size:14px}
+.empty svg{width:36px;height:36px;stroke:var(--mut);fill:none;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;margin-bottom:10px;display:block;margin-left:auto;margin-right:auto}
+
+/* ─── Divider ──────────────────────────────────────────────────────────────── */
+.divider{height:1px;background:rgba(150,175,200,0.2);margin:14px 0}
+
+/* ─── Page animations ──────────────────────────────────────────────────────── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.page.active{animation:fadeIn .22s ease}
+.card{animation:fadeUp .28s ease both}
+
+/* ─── Loading overlay ──────────────────────────────────────────────────────── */
+#loader{
+  position:fixed;inset:0;z-index:800;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(201,216,232,0.4);backdrop-filter:blur(4px);
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+#loader.on{opacity:1;pointer-events:all}
+.spinner{
+  width:36px;height:36px;border:3px solid rgba(75,124,243,0.2);
+  border-top-color:var(--pri);border-radius:50%;
+  animation:spin .7s linear infinite;
+}
+
+/* ─── Sidebar tooltip ──────────────────────────────────────────────────────── */
+.sib{position:relative}
+.sib-tip{
+  position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%);
+  background:rgba(26,37,53,0.88);color:#fff;
+  font-size:11px;font-weight:600;white-space:nowrap;
+  padding:5px 10px;border-radius:7px;
+  pointer-events:none;opacity:0;transition:opacity .15s;
+  backdrop-filter:blur(6px);
+}
+.sib-tip::before{
+  content:'';position:absolute;right:100%;top:50%;transform:translateY(-50%);
+  border:5px solid transparent;border-right-color:rgba(26,37,53,0.88);
+}
+.sib:hover .sib-tip{opacity:1}
+
+/* ─── Button loading state ─────────────────────────────────────────────────── */
+.btn:disabled{opacity:.6;cursor:not-allowed;transform:none!important}
+.btn-spin{
+  display:inline-block;width:14px;height:14px;
+  border:2px solid rgba(255,255,255,0.4);border-top-color:#fff;
+  border-radius:50%;animation:spin .6s linear infinite;
+}
+
+/* ─── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(150,175,200,0.4);border-radius:4px}
+</style>
+</head>
+<body>
+
+<!-- SVG icon defs (reusable symbols) -->
+<svg style="display:none" aria-hidden="true">
+  <defs>
+    <!-- Home / Dashboard -->
+    <symbol id="ic-home" viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><path d="M9 21V12h6v9"/></symbol>
+    <!-- Transactions / List -->
+    <symbol id="ic-list" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></symbol>
+    <!-- Wallet / Clock history -->
+    <symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></symbol>
+    <!-- Logout -->
+    <symbol id="ic-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+    <!-- Credit card -->
+    <symbol id="ic-card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></symbol>
+    <!-- Plus / Add money -->
+    <symbol id="ic-plus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></symbol>
+    <!-- Percent / Cashback rules -->
+    <symbol id="ic-percent" viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></symbol>
+    <!-- Store / Merchant -->
+    <symbol id="ic-store" viewBox="0 0 24 24"><path d="M3 9l1-5h16l1 5"/><path d="M3 9h18v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9z"/><path d="M9 21V12h6v9"/></symbol>
+    <!-- Chart / Analytics -->
+    <symbol id="ic-chart" viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="4" width="4" height="17"/></symbol>
+    <!-- Alert triangle -->
+    <symbol id="ic-alert" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+    <!-- Inbox / empty -->
+    <symbol id="ic-inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+    <!-- Lock / secure -->
+    <symbol id="ic-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <!-- Check circle -->
+    <symbol id="ic-check" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></symbol>
+    <!-- Lightbulb / info -->
+    <symbol id="ic-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></symbol>
+    <!-- Arrow up-right -->
+    <symbol id="ic-arrow-ur" viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></symbol>
+    <!-- Settings (not used in nav but good to have) -->
+    <symbol id="ic-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  </defs>
+</svg>
+
+<!-- shorthand helper: use <svg class="..."><use href="#ic-NAME"/></svg> -->
+
+<!-- ░░ AUTH PAGE ░░ -->
+<div id="auth-wrap" class="hide">
+  <div id="auth-card" class="card">
+    <div style="text-align:center;margin-bottom:20px">
+      <div class="auth-logo-icon">
+        <svg><use href="#ic-card"/></svg>
+      </div>
+      <div style="font-size:22px;font-weight:800;color:var(--pri);letter-spacing:-.5px">FinPay</div>
+      <div style="font-size:13px;color:var(--mut);margin-top:3px">Campus Wallet &amp; Payments</div>
+    </div>
+    <div class="tabs" id="auth-tabs">
+      <button class="tab on" onclick="authView('login')">Login</button>
+      <button class="tab" onclick="authView('register')">Register</button>
+    </div>
+    <div id="auth-form-wrap"></div>
+  </div>
+  <div style="margin-top:16px;font-size:12px;color:var(--mut);display:flex;align-items:center;gap:5px">
+    <svg style="width:12px;height:12px;stroke:var(--mut);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#ic-lock"/></svg>
+    Secure campus payments
+  </div>
+</div>
+
+<!-- ░░ MAIN APP SHELL ░░ -->
+<div id="shell" class="hide">
+
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div class="sib sib-logo" title="FinPay">FP</div>
+
+    <div class="sib active" id="snav-home" onclick="navTo('home')">
+      <svg><use href="#ic-home"/></svg>
+      <span class="sib-tip">Dashboard</span>
+    </div>
+    <div class="sib" id="snav-txn" onclick="navTo('txn')">
+      <svg><use href="#ic-list"/></svg>
+      <span class="sib-tip">Transactions</span>
+    </div>
+    <div class="sib" id="snav-wallet" onclick="navTo('wallet')">
+      <svg><use href="#ic-clock"/></svg>
+      <span class="sib-tip">Wallet History</span>
+    </div>
+
+    <div class="sib-spacer"></div>
+
+    <div class="sib sib-logout" onclick="logout()">
+      <svg><use href="#ic-logout"/></svg>
+      <span class="sib-tip">Logout</span>
+    </div>
+  </nav>
+
+  <!-- Content Area -->
+  <div id="content">
+
+    <!-- Top Bar -->
+    <div id="topbar">
+      <div id="greeting">Good <span id="time-greet"></span>, <strong id="greet-name"></strong></div>
+      <div class="topbar-right">
+        <span id="clock-mini"></span>
+        <div id="user-pill">
+          <div class="avatar" id="user-avatar">?</div>
+          <span id="user-label">—</span>
+        </div>
+        <button id="logout-btn" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <!-- HOME page -->
+    <div id="page-home" class="page active">
+      <div class="sec-title" id="page-home-title">Dashboard</div>
+      <div id="home-content"></div>
+    </div>
+
+    <!-- TRANSACTIONS page -->
+    <div id="page-txn" class="page">
+      <div class="sec-title">Transactions</div>
+      <div id="txn-content"></div>
+    </div>
+
+    <!-- WALLET HISTORY page -->
+    <div id="page-wallet" class="page">
+      <div class="sec-title">Wallet History</div>
+      <div id="wallet-content"></div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /shell -->
+
+<div id="toast"></div>
+<div id="loader"><div class="spinner"></div></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   UTILS
+══════════════════════════════════════════════════════════════════════════════*/
+let token=null, user=null;
+try{token=sessionStorage.getItem("t")}catch(e){}
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const inr=n=>"₹"+Number(n).toFixed(2);
+const dt=s=>new Date(s+"Z").toLocaleString("en-IN",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
+
+// Inline SVG use helper
+const icon=(id,extra="")=>`<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle;${extra}"><use href="#${id}"/></svg>`;
+
+let _toastTimer=null;
+function toast(msg,ok=true){
+  const t=$("toast");
+  t.textContent=msg;
+  t.style.background=ok?"rgba(21,128,61,0.92)":"rgba(185,28,28,0.92)";
+  t.classList.add("show");t.style.display="block";
+  if(_toastTimer)clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>{t.classList.remove("show");setTimeout(()=>t.style.display="none",300)},3000);
+}
+
+async function api(path,method="GET",body){
+  const r=await fetch(path,{method,headers:{"Content-Type":"application/json",...(token?{Authorization:"Bearer "+token}:{})},body:body?JSON.stringify(body):undefined});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){let m=d.detail;if(Array.isArray(m))m=m.map(x=>x.msg).join(", ");throw new Error(m||"Something went wrong")}
+  return d;
+}
+const run=async(f,btn)=>{
+  if(btn){btn.disabled=true;btn._txt=btn.innerHTML;btn.innerHTML=`<span class="btn-spin"></span>`;}
+  $("loader").classList.add("on");
+  try{await f()}catch(e){toast(e.message,false);}
+  $("loader").classList.remove("on");
+  if(btn){btn.disabled=false;btn.innerHTML=btn._txt;}
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CLOCK
+══════════════════════════════════════════════════════════════════════════════*/
+function updateClock(){
+  const now=new Date();
+  const h=now.getHours(),m=now.getMinutes();
+  const h12=h%12||12,ampm=h<12?"AM":"PM";
+  const pad=n=>String(n).padStart(2,"0");
+  const hm=`${pad(h12)}:${pad(m)}`;
+
+  const hmel=$("hm"),ampm_el=$("ampm");
+  if(hmel){hmel.textContent=hm;if(ampm_el)ampm_el.textContent=ampm;}
+  const bd=$("big-date");
+  if(bd){
+    const days=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    const months=["January","February","March","April","May","June","July","August","September","October","November","December"];
+    bd.textContent=`${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]}`;
+  }
+  const cm=$("clock-mini");
+  if(cm)cm.textContent=`${hm} ${ampm}`;
+  const tg=$("time-greet");
+  if(tg)tg.textContent=h<12?"morning":h<17?"afternoon":"evening";
+}
+setInterval(updateClock,1000);updateClock();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════════════════════════════════════════════*/
+let currentNav="home";
+function navTo(id){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll(".sib[id^='snav-']").forEach(s=>s.classList.remove("active"));
+  $("page-"+id).classList.add("active");
+  const sib=$("snav-"+id);if(sib)sib.classList.add("active");
+  currentNav=id;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AUTH
+══════════════════════════════════════════════════════════════════════════════*/
+function authView(mode="login"){
+  $("shell").classList.add("hide");$("auth-wrap").classList.remove("hide");
+  const tabs=$("auth-tabs").querySelectorAll(".tab");
+  tabs[0].classList.toggle("on",mode==="login");
+  tabs[1].classList.toggle("on",mode==="register");
+  $("auth-form-wrap").innerHTML=`
+  <form onsubmit="return submitAuth(event,'${mode}')">
+    ${mode==="register"?`<input id="a_name" placeholder="Full name" required>`:""}
+    <input id="a_email" type="email" placeholder="Email address" required>
+    <input id="a_pass" type="password" placeholder="Password (min 6 chars)" required>
+    ${mode==="register"?`<select id="a_role">
+      <option value="student">Student</option>
+      <option value="merchant">Merchant</option>
+      <option value="admin">Admin</option>
+    </select>`:""}
+    <button class="btn btn-primary" type="submit">${mode==="login"?"Login to FinPay":"Create Account"}</button>
+  </form>
+  ${mode==="login"
+    ?`<p style="text-align:center;margin-top:12px;font-size:13px;color:var(--mut)">Don't have an account? <a href="#" onclick="authView('register');return false" style="color:var(--pri);font-weight:600">Register</a></p>`
+    :`<p style="text-align:center;margin-top:12px;font-size:13px;color:var(--mut)">Already have an account? <a href="#" onclick="authView('login');return false" style="color:var(--pri);font-weight:600">Login</a></p>`}`;
+}
+
+function submitAuth(e,mode){e.preventDefault();const btn=e.submitter||e.target.querySelector('button[type="submit"]');run(async()=>{
+  const email=$("a_email").value.trim(),password=$("a_pass").value;
+  if(mode==="register")await api("/auth/register","POST",{name:$("a_name").value,email,password,role:$("a_role").value});
+  const d=await api("/auth/login","POST",{email,password});
+  token=d.access_token;try{sessionStorage.setItem("t",token)}catch(e){}
+  await enter();
+},btn);return false;}
+
+function logout(){token=null;user=null;try{sessionStorage.removeItem("t")}catch(e){}authView();}
+
+async function enter(){
+  try{user=await api("/auth/me")}catch(e){return logout();}
+  $("auth-wrap").classList.add("hide");$("shell").classList.remove("hide");
+  const initials=(user.name||"?").split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();
+  $("user-avatar").textContent=initials;
+  $("user-label").textContent=`${user.name} · ${user.role}`;
+  $("greet-name").textContent=user.name.split(" ")[0];
+  updateClock();
+  const walletNav=$("snav-wallet");
+  if(walletNav)walletNav.style.display=user.role==="student"?"flex":"none";
+  const txnNav=$("snav-txn");
+  if(txnNav)txnNav.style.display=user.role==="admin"?"none":"flex";
+  ({student,merchant,admin})[user.role]();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STUDENT
+══════════════════════════════════════════════════════════════════════════════*/
+let _studentData={};
+async function student(){await run(async()=>{
+  const [bal,ms,led,pays,rules]=await Promise.all([api("/wallet/balance"),api("/merchants"),api("/wallet/history"),api("/payments/history"),api("/cashback/rules")]);
+  _studentData={bal,ms,led,pays,rules};
+  _studentData.mn=Object.fromEntries(ms.map(m=>[m.id,m.business_name]));
+  renderStudentHome();
+  renderStudentTxn(pays,_studentData.mn);
+  renderStudentWallet(led);
+});}
+
+function renderStudentHome(){
+  const {bal,ms,rules}=_studentData;
+  $("page-home-title").textContent="Student Dashboard";
+  $("home-content").innerHTML=`
+  <div class="grid-3" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Wallet Balance</span>
+        <div class="icon-wrap"><svg><use href="#ic-card"/></svg></div>
+      </div>
+      <div class="big-num">${inr(bal.balance)}</div>
+      <div class="cashback-pill">
+        <svg><use href="#ic-percent"/></svg>
+        ${rules.rate_percent}% cashback on payments &ge; ${inr(rules.min_payment)}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Top Up Wallet</span>
+        <div class="icon-wrap ok"><svg><use href="#ic-plus"/></svg></div>
+      </div>
+      <form onsubmit="return topup(event)">
+        <input id="t_amt" type="number" min="1" max="50000" step="0.01" placeholder="Amount (max &#8377;50,000)" required>
+        <button class="btn btn-primary" type="submit">Add Money</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Pay a Merchant</span>
+        <div class="icon-wrap"><svg><use href="#ic-arrow-ur"/></svg></div>
+      </div>
+      ${ms.length?`<form onsubmit="return pay(event)">
+        <select id="p_m">${ms.map(m=>`<option value="${m.id}">${esc(m.business_name)} — ${esc(m.category)}</option>`).join("")}</select>
+        <input id="p_amt" type="number" min="1" step="0.01" placeholder="Amount" required>
+        <button class="btn btn-primary" type="submit">Pay Now</button>
+      </form>`:`<div class="empty"><svg style="width:32px;height:32px"><use href="#ic-store"/></svg>No merchants registered yet.</div>`}
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Recent Payments</span>
+        <a href="#" onclick="navTo('txn');return false" style="font-size:12px;color:var(--pri);font-weight:600">View all</a>
+      </div>
+      ${renderPayTable(_studentData.pays.slice(0,4),_studentData.mn,true)}
+    </div>
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Cashback Rules</span>
+        <div class="icon-wrap"><svg><use href="#ic-percent"/></svg></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:4px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px;color:var(--ink2)">Cashback Rate</span>
+          <span class="badge badge-pri">${rules.rate_percent}%</span>
+        </div>
+        <div class="divider"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px;color:var(--ink2)">Minimum Payment</span>
+          <span style="font-weight:600;font-size:13px">${inr(rules.min_payment)}</span>
+        </div>
+        <div class="divider"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px;color:var(--ink2)">Max Cashback / Payment</span>
+          <span style="font-weight:600;font-size:13px">${inr(rules.max_cashback_per_payment)}</span>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderPayTable(pays,mn,compact=false){
+  if(!pays.length)return`<div class="empty"><svg><use href="#ic-inbox"/></svg>No payments yet.</div>`;
+  return`<div class="tbl-wrap"><table>
+    <tr><th>#</th><th>Merchant</th><th>Amount</th><th>Cashback</th>${compact?"":"<th>Date</th>"}</tr>
+    ${pays.map(p=>`<tr>
+      <td style="color:var(--mut);font-size:12px">${p.id}</td>
+      <td><b>${esc(mn[p.merchant_id]||"ID:"+p.merchant_id)}</b></td>
+      <td class="neg">${inr(p.amount)}</td>
+      <td class="pos">+${inr(p.cashback)}</td>
+      ${compact?"":` <td style="color:var(--mut)">${dt(p.created_at)}</td>`}
+    </tr>`).join("")}
+  </table></div>`;}
+
+function renderStudentTxn(pays,mn){
+  $("txn-content").innerHTML=`<div class="card">
+    <div class="card-title-row">
+      <span class="card-title">All My Payments</span>
+      <span class="badge badge-pri">${pays.length} total</span>
+    </div>
+    ${pays.length?`<div class="tbl-wrap"><table>
+      <tr><th>#</th><th>Merchant</th><th>Amount</th><th>Cashback</th><th>Status</th><th>Date</th></tr>
+      ${pays.map(p=>`<tr>
+        <td style="color:var(--mut);font-size:12px">${p.id}</td>
+        <td><b>${esc(mn[p.merchant_id]||"ID:"+p.merchant_id)}</b></td>
+        <td class="neg">${inr(p.amount)}</td>
+        <td class="pos">+${inr(p.cashback)}</td>
+        <td><span class="badge badge-ok">${p.status}</span></td>
+        <td style="color:var(--mut)">${dt(p.created_at)}</td>
+      </tr>`).join("")}
+    </table></div>`:`<div class="empty"><svg><use href="#ic-inbox"/></svg>No payments yet. Go to Dashboard to make your first payment.</div>`}
+  </div>`;}
+
+function renderStudentWallet(led){
+  $("wallet-content").innerHTML=`<div class="card">
+    <div class="card-title-row">
+      <span class="card-title">Wallet Ledger</span>
+      <span class="badge badge-pri">${led.length} entries</span>
+    </div>
+    ${led.length?`<div class="tbl-wrap"><table>
+      <tr><th>Type</th><th>Amount</th><th>Reference</th><th>Date</th></tr>
+      ${led.map(l=>`<tr>
+        <td><span class="badge ${l.entry_type==="TOPUP"?"badge-ok":l.entry_type==="CASHBACK"?"badge-pri":"badge-bad"}">${l.entry_type}</span></td>
+        <td class="${l.amount>=0?"pos":"neg"}">${l.amount>=0?"+":""}${inr(l.amount)}</td>
+        <td style="color:var(--ink2);font-size:12px">${esc(l.reference)}</td>
+        <td style="color:var(--mut)">${dt(l.created_at)}</td>
+      </tr>`).join("")}
+    </table></div>`:`<div class="empty"><svg><use href="#ic-clock"/></svg>No wallet history yet.</div>`}
+  </div>`;}
+
+function topup(e){e.preventDefault();const btn=e.submitter||e.target.querySelector('button');run(async()=>{
+  await api("/wallet/topup","POST",{amount:+$("t_amt").value});
+  toast("Wallet topped up successfully");student();
+},btn);return false;}
+
+function pay(e){e.preventDefault();const btn=e.submitter||e.target.querySelector('button');run(async()=>{
+  const r=await api("/payments","POST",{merchant_id:+$("p_m").value,amount:+$("p_amt").value});
+  toast(r.cashback>0?`Payment successful! +${inr(r.cashback)} cashback credited`:"Payment successful");
+  student();
+},btn);return false;}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MERCHANT
+══════════════════════════════════════════════════════════════════════════════*/
+async function merchant(){await run(async()=>{
+  let me=null;try{me=await api("/merchants/me")}catch(e){}
+  if(!me){
+    $("page-home-title").textContent="Merchant Setup";
+    $("home-content").innerHTML=`<div class="card" style="max-width:400px;margin:40px auto">
+      <div style="text-align:center;margin-bottom:20px">
+        <div class="icon-wrap" style="width:52px;height:52px;border-radius:14px;margin:0 auto 12px">
+          <svg style="width:26px;height:26px"><use href="#ic-store"/></svg>
+        </div>
+        <div style="font-weight:700;font-size:17px">Create Your Merchant Profile</div>
+        <div style="color:var(--mut);font-size:13px;margin-top:4px">Set up your business to start receiving payments</div>
+      </div>
+      <form onsubmit="return mkMerchant(event)">
+        <input id="m_name" placeholder="Business name" required>
+        <input id="m_cat" placeholder="Category (food, books, stationery...)" value="general">
+        <button class="btn btn-primary" type="submit">Create Profile</button>
+      </form>
+    </div>`;
+    $("txn-content").innerHTML=`<div class="empty" style="margin-top:60px"><svg><use href="#ic-store"/></svg>Set up your merchant profile first.</div>`;
+    return;
+  }
+  const rec=await api("/payments/received");
+  const total=rec.reduce((s,p)=>s+p.amount,0);
+  const count=rec.length;
+  $("page-home-title").textContent="Merchant Dashboard";
+  $("home-content").innerHTML=`
+  <div class="grid-3" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Business</span>
+        <div class="icon-wrap ok"><svg><use href="#ic-store"/></svg></div>
+      </div>
+      <div class="big-num" style="font-size:24px">${esc(me.business_name)}</div>
+      <div class="sub-label">Category: ${esc(me.category)} &nbsp;·&nbsp; ID: ${me.id}</div>
+    </div>
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Total Received</span>
+        <div class="icon-wrap ok"><svg><use href="#ic-chart"/></svg></div>
+      </div>
+      <div class="big-num">${inr(total)}</div>
+      <div class="sub-label">${count} payments received</div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+      <div class="icon-wrap" style="width:48px;height:48px;border-radius:14px;margin-bottom:10px">
+        <svg style="width:22px;height:22px"><use href="#ic-list"/></svg>
+      </div>
+      <div style="font-size:13px;color:var(--mut)">View all received payments in the <strong>Transactions</strong> tab</div>
+      <button class="btn btn-ghost" style="margin-top:14px;width:auto;padding:8px 18px" onclick="navTo('txn')">View Transactions</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title-row">
+      <span class="card-title">Recent Payments Received</span>
+      <a href="#" onclick="navTo('txn');return false" style="font-size:12px;color:var(--pri);font-weight:600">View all</a>
+    </div>
+    ${renderMerchantPayTable(rec.slice(0,5))}
+  </div>`;
+
+  $("txn-content").innerHTML=`<div class="card">
+    <div class="card-title-row">
+      <span class="card-title">All Payments Received</span>
+      <span class="badge badge-ok">${count} total</span>
+    </div>
+    ${renderMerchantPayTable(rec)}
+  </div>`;}
+);}
+
+function renderMerchantPayTable(rec){
+  if(!rec.length)return`<div class="empty"><svg><use href="#ic-inbox"/></svg>No payments received yet.</div>`;
+  return`<div class="tbl-wrap"><table>
+    <tr><th>#</th><th>Student ID</th><th>Amount</th><th>Cashback</th><th>Status</th><th>Date</th></tr>
+    ${rec.map(p=>`<tr>
+      <td style="color:var(--mut);font-size:12px">${p.id}</td>
+      <td>Student #${p.student_id}</td>
+      <td class="pos">${inr(p.amount)}</td>
+      <td style="color:var(--mut)">${inr(p.cashback)}</td>
+      <td><span class="badge badge-ok">${p.status}</span></td>
+      <td style="color:var(--mut)">${dt(p.created_at)}</td>
+    </tr>`).join("")}
+  </table></div>`;}
+
+function mkMerchant(e){e.preventDefault();run(async()=>{
+  await api("/merchants","POST",{business_name:$("m_name").value,category:$("m_cat").value});
+  toast("Merchant profile created");merchant();
+});return false;}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ADMIN
+══════════════════════════════════════════════════════════════════════════════*/
+async function admin(){
+  const n=new Date();
+  $("page-home-title").textContent="Admin Dashboard";
+  document.querySelectorAll(".sib[id^='snav-']").forEach(s=>{
+    if(s.id!=="snav-home")s.style.display="none";
+  });
+  $("home-content").innerHTML=`
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title-row">
+      <span class="card-title">Monthly Reconciliation Report</span>
+      <div class="icon-wrap"><svg><use href="#ic-chart"/></svg></div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:flex-end">
+      <div style="flex:1">
+        <label style="font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bottom:5px">Year</label>
+        <input id="r_y" type="number" value="${n.getFullYear()}" min="2020" max="2099" style="margin-bottom:0">
+      </div>
+      <div style="flex:1">
+        <label style="font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bottom:5px">Month</label>
+        <input id="r_m" type="number" min="1" max="12" value="${n.getMonth()+1}" style="margin-bottom:0">
+      </div>
+      <button class="btn btn-primary" style="width:auto;padding:10px 24px;flex-shrink:0" onclick="report()">Generate</button>
+    </div>
+  </div>
+  <div id="rep"></div>`;
+  report();
+}
+
+function report(){run(async()=>{
+  const r=await api(`/reconciliation/monthly?year=${$("r_y").value}&month=${$("r_m").value}`);
+  const balanced=r.status==="BALANCED";
+  $("rep").innerHTML=`
+  <div class="grid-auto" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Period</span>
+        <div class="icon-wrap"><svg><use href="#ic-clock"/></svg></div>
+      </div>
+      <div class="big-num" style="font-size:28px">${r.period}</div>
+      <div class="sub-label">${r.total_transactions} transactions</div>
+    </div>
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Total Sales</span>
+        <div class="icon-wrap ok"><svg><use href="#ic-chart"/></svg></div>
+      </div>
+      <div class="big-num">${inr(r.total_sales)}</div>
+      <div class="sub-label">Gross revenue</div>
+    </div>
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Cashback Given</span>
+        <div class="icon-wrap"><svg><use href="#ic-percent"/></svg></div>
+      </div>
+      <div class="big-num" style="color:var(--pri)">${inr(r.total_cashback)}</div>
+      <div class="sub-label">Student rewards</div>
+    </div>
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Wallet Consistency</span>
+        <div class="icon-wrap ${balanced?"ok":"bad"}">
+          <svg><use href="${balanced?"#ic-check":"#ic-alert"}"/></svg>
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <span class="badge ${balanced?"badge-ok":"badge-bad"}" style="font-size:13px;padding:5px 14px">${r.status}</span>
+      </div>
+      <div class="sub-label" style="margin-top:8px">${r.wallet_mismatches.length===0?"All wallets balanced":r.wallet_mismatches.length+" mismatch(es) found"}</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title-row">
+      <span class="card-title">Merchant Settlement</span>
+      <span class="badge badge-pri">${r.merchants.length} merchants</span>
+    </div>
+    ${r.merchants.length?`<div class="tbl-wrap"><table>
+      <tr><th>Merchant</th><th>Transactions</th><th>Gross Sales</th><th>Cashback Given</th><th>Settlement Due</th></tr>
+      ${r.merchants.map(m=>`<tr>
+        <td><b>${esc(m.business_name)}</b></td>
+        <td><span class="badge badge-pri">${m.transactions}</span></td>
+        <td>${inr(m.gross_sales)}</td>
+        <td style="color:var(--pri)">${inr(m.cashback_given)}</td>
+        <td><span style="font-weight:700;font-size:15px">${inr(m.settlement_due)}</span></td>
+      </tr>`).join("")}
+    </table></div>`:`<div class="empty"><svg><use href="#ic-inbox"/></svg>No transactions found for this period.</div>`}
+  </div>
+  ${!balanced&&r.wallet_mismatches.length?`<div class="card" style="margin-top:16px;border-color:rgba(239,68,68,.3)">
+    <div class="card-title-row">
+      <span class="card-title" style="color:var(--bad)">Wallet Mismatches Detected</span>
+      <div class="icon-wrap bad"><svg><use href="#ic-alert"/></svg></div>
+    </div>
+    <div class="tbl-wrap"><table>
+      <tr><th>Wallet ID</th><th>Recorded Balance</th><th>Ledger Sum</th></tr>
+      ${r.wallet_mismatches.map(w=>`<tr><td>${w.wallet_id}</td><td class="neg">${inr(w.balance)}</td><td class="neg">${inr(w.ledger_sum)}</td></tr>`).join("")}
+    </table></div>
+  </div>`:""}`;
+});}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOOT
+══════════════════════════════════════════════════════════════════════════════*/
+token?enter():authView();
+</script>
+</body>
+</html>
